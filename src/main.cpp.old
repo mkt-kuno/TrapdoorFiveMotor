@@ -1,0 +1,107 @@
+#include <Arduino.h>
+#include <limits.h>
+
+int usec_high = 250;
+int usec_low = 750;
+
+int PUL=6; //define Pulse pin
+int DIR=5; //define Direction pin
+int ENA=4; //define Enable Pin
+
+int LIM_MAX = 8;
+int LIM_MIN = 9;
+
+void test();
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(PUL, OUTPUT);
+  pinMode(DIR, OUTPUT);
+  pinMode(ENA, OUTPUT);
+  
+  pinMode(LIM_MAX, INPUT_PULLUP);
+  pinMode(LIM_MIN, INPUT_PULLUP);
+
+  test();
+}
+
+void pulse(){
+  digitalWrite(PUL,LOW);
+  delayMicroseconds(usec_high);
+  digitalWrite(PUL,HIGH);
+  delayMicroseconds(usec_low);
+  digitalWrite(PUL,HIGH);
+}
+
+long nobiru(long steps)
+{
+  long ret;
+  if (steps < 0) steps = LONG_MAX;
+  //伸びる方向
+  for (ret=0; ret<steps; ret++)
+  {
+    if (!digitalRead(LIM_MAX)) break;
+    digitalWrite(DIR,LOW);
+    digitalWrite(ENA,HIGH);
+    pulse();
+  }
+  return ret;
+}
+
+long chijimu(long steps)
+{
+  long ret;
+  if (steps < 0) steps = LONG_MAX;
+  //縮む方向
+  for (ret=0; ret<steps; ret++)
+  {
+    if (!digitalRead(LIM_MIN)) break;
+    digitalWrite(DIR,HIGH);
+    digitalWrite(ENA,HIGH);
+    pulse();
+  }
+  return ret;
+}
+
+void nobi_chiji_loop(){
+  long steps;
+  
+  steps = chijimu(-1);
+  digitalWrite(ENA,LOW);
+  Serial.print("steps:");
+  Serial.print(steps);
+  Serial.print(",LIM_MAX:");
+  Serial.print(digitalRead(LIM_MAX));
+  Serial.print(",LIM_MIN:");
+  Serial.print(digitalRead(LIM_MIN));
+  Serial.println("");
+  delay(1000);
+
+  steps = nobiru(-1);
+  digitalWrite(ENA,LOW);
+  Serial.print("steps:");
+  Serial.print(steps);
+  Serial.print(",LIM_MAX:");
+  Serial.print(digitalRead(LIM_MAX));
+  Serial.print(",LIM_MIN:");
+  Serial.print(digitalRead(LIM_MIN));
+  Serial.println("");
+  delay(1000);
+}
+
+void test(){
+  delay(1000);
+  //電磁ロックON
+  digitalWrite(ENA,HIGH);
+  //限界まで伸ばす
+  //nobiru(-1);
+  //指定ステップ分縮める
+  long steps = chijimu((long)(2400)*48);
+  //電磁ロックON
+  Serial.print("steps:");
+  Serial.println(steps);
+}
+
+void loop() {
+
+}
