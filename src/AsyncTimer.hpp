@@ -15,7 +15,7 @@ class AsyncTimer {
         void next_micorsec(unsigned long usec) {
             next_usec = usec;
         }
-        void next_millsec(unsigned long msec) {
+        void next_millisec(unsigned long msec) {
             next_usec = msec * 1000;
         }
         void next_sec(unsigned long sec) {

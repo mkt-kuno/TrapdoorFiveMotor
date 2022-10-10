@@ -4,6 +4,10 @@
 #include <Arduino.h>
 #include <math.h>
 
+#define MAX_POSITION_MM (5)
+#define MIN_POSITION_MM (-5)
+#define MAX_SPEED_MM_PER_MIN (30)
+
 // Memo 
 // Linear Actuator: 2400 steps / mm
 //                    12   rot / mm
@@ -11,7 +15,7 @@
 // MotorDriver TB6600
 
 class AsyncStepper {
-  enum STEPPER_STATE {
+  typedef enum STEPPER_STATE {
     STEPPER_STOP = 0,
     STEPPER_READY,
     STEPPER_DRIVE_CHECK_SWITCH,
@@ -19,14 +23,14 @@ class AsyncStepper {
     STEPPER_DRIVE_KEEP_HIGH,
     STEPPER_DRIVE_LOW,
     STEPPER_DRIVE_KEEP_LOW,
-  };
+  } STEPPER_STATE_T;
   private:
     const unsigned int step_per_mm = 2400;
     long position_step = 0;
     long target_step = 0;
     unsigned int pulse_high_usec = 0;
     unsigned int pulse_low_usec = 0;
-    STEPPER_STATE state = STEPPER_STOP;
+    STEPPER_STATE_T state = STEPPER_STOP;
     unsigned long prev_micros = 0;
     int ena_pin, dir_pin, pul_pin, max_pin, min_pin;
 
@@ -35,7 +39,7 @@ class AsyncStepper {
     // 13kHz(77us) when duty cycle is 50 high / 50 high
     void set_pulse_width(double mm_per_min) {
         if (mm_per_min < 0.0) mm_per_min = mm_per_min * (-1.0);
-        if (mm_per_min > 30.0) mm_per_min = 30.0;
+        if (mm_per_min > MAX_SPEED_MM_PER_MIN) mm_per_min = MAX_SPEED_MM_PER_MIN;
 
         double step_microsec = floor((double)60.0E6 / ((double)mm_per_min * step_per_mm));
         pulse_high_usec = pulse_low_usec = floor(step_microsec / 2);
@@ -61,7 +65,9 @@ class AsyncStepper {
 
     void start(double move_mm, double mm_per_min, bool incremental = false) {
         if (state != STEPPER_STOP) return;
-        if (move_mm == 0 || mm_per_min == 0) return;
+        if ((incremental && move_mm == 0) || mm_per_min == 0) return;
+        if (move_mm > MAX_POSITION_MM) move_mm = MAX_POSITION_MM;
+        else if (move_mm < MIN_POSITION_MM) move_mm = MIN_POSITION_MM;
         long steps = floor(step_per_mm * move_mm);
         if (incremental) target_step = position_step + steps;
         else target_step = steps;
@@ -70,11 +76,26 @@ class AsyncStepper {
         return;
     }
 
-    float get_mm(void) { return (float)((double)position_step / (double)step_per_mm);}
-    void set_mm(double current_mm) {position_step = (long)((double)step_per_mm * current_mm);}
+    float get_current_mm(void) { return (float)((double)position_step / (double)step_per_mm);}
+    void set_current_mm(double current_mm) {
+        if (state != STEPPER_STOP) return;
+        if (current_mm > MAX_POSITION_MM) current_mm = MAX_POSITION_MM;
+        else if (current_mm < MIN_POSITION_MM) current_mm = MIN_POSITION_MM;
+        position_step = (long)((double)step_per_mm * current_mm);
+    }
+    long get_current_steps(void) { return position_step;}
+    void set_current_steps(double current_steps) {
+        if (state != STEPPER_STOP) return;
+        if (current_steps > (step_per_mm * MAX_POSITION_MM)) current_steps = step_per_mm * MAX_POSITION_MM;
+        if (current_steps > (step_per_mm * MIN_POSITION_MM)) current_steps = step_per_mm * MIN_POSITION_MM;
+        position_step = current_steps;
+    }
     bool get_max_swich(void) { return digitalRead(max_pin); }
     bool get_min_swich(void) { return digitalRead(min_pin); }
-
+    void stepper_power(bool ena_val) {
+        if (state != STEPPER_STOP) return;
+        digitalWrite(ena_pin, ena_val);
+    }
     bool is_stop() { return (state==STEPPER_STOP)?true:false; }
 
     void loop() {

@@ -5,7 +5,7 @@
 #include <Print.h>
 #include <RingBuf.h>
 
-#define TX_BUFFER_SIZE 512
+#define TX_BUFFER_SIZE 1024
 #define RX_BUFFER_SIZE 256
 
 class AsyncSerial : public Print {
