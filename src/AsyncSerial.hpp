@@ -6,13 +6,11 @@
 #include <RingBuf.h>
 
 #define TX_BUFFER_SIZE 512
-#define RX_BUFFER_SIZE 128
+#define RX_BUFFER_SIZE 256
 
 class AsyncSerial : public Print {
     private:
         RingBuf<unsigned char, TX_BUFFER_SIZE> tx_buf;
-        unsigned char rx_buf[RX_BUFFER_SIZE+1];
-        int rx_ptr = 0;
         HardwareSerial *serial = NULL;
 
     public:
@@ -30,25 +28,28 @@ class AsyncSerial : public Print {
         size_t write(uint8_t data) {
             if (tx_buf.isFull()) return 0;
             tx_buf.push(data);
+            return 1;
         }
 
         void begin(long baud) {
             serial->begin(baud);
         }
+        bool available() {
+            return serial->available();
+        }
+        int read() {
+            return serial->read();
+        }
 
         void loop(void) {
             unsigned char c;
-            if (serial->available()) {
-                rx_buf[rx_ptr] = serial->read();
-                if (rx_ptr < (RX_BUFFER_SIZE-1)) rx_ptr++;
-            }
             if (tx_buf.pop(c)) {
-                serial->print(c);
+                serial->print((char)c);
             }
         }
-        String readline(void) {
-
-        }
+        // String readline(void) {
+            
+        // }
     
 };
 #endif /*AsyncSerial_h*/

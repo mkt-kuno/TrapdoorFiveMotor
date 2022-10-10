@@ -27,16 +27,24 @@ class AsyncStepper {
     unsigned int pulse_high_usec = 0;
     unsigned int pulse_low_usec = 0;
     STEPPER_STATE state = STEPPER_STOP;
-    
+    unsigned long prev_micros = 0;
     int ena_pin, dir_pin, pul_pin, max_pin, min_pin;
 
-    // void control_pin(uint8_t pul_val) {
-    //   uint8_t dir_val = (target_step < position_step)?HIGH:LOW;
-    //   digitalWrite(dir_pin, dir_val);
-    //   digitalWrite(ena_pin,HIGH);
-    //   digitalWrite(ena_pin, pul_val);
-    //   return;
-    // }
+    // About duty cycle
+    // 20kHz(50us) when duty cyle is 25 high / 75 low
+    // 13kHz(77us) when duty cycle is 50 high / 50 high
+    void set_pulse_width(double mm_per_min) {
+        if (mm_per_min < 0.0) mm_per_min = mm_per_min * (-1.0);
+        if (mm_per_min > 30.0) mm_per_min = 30.0;
+
+        double step_microsec = floor((double)60.0E6 / ((double)mm_per_min * step_per_mm));
+        pulse_high_usec = pulse_low_usec = floor(step_microsec / 2);
+        if (step_microsec < 50.0) {
+            pulse_high_usec = floor(step_microsec / 4);
+            pulse_low_usec = floor(step_microsec * 3 / 4);
+        }
+    }
+
   public:
     AsyncStepper(const int pulse, const int dir, const int ena, const int max, const int min) {
       pul_pin = pulse;
@@ -51,30 +59,23 @@ class AsyncStepper {
       pinMode(min_pin, INPUT_PULLUP);
     }
 
-    void start(float move_mm, float mm_per_min) {
-      if (state != STEPPER_STOP) return;
-      if (move_mm == 0 || mm_per_min == 0) return;
-
-      target_step = position_step + floor(step_per_mm * move_mm);
-      if (mm_per_min < 0.0f) mm_per_min = mm_per_min * (-1.0f);
-      if (mm_per_min > 30.0f) mm_per_min = 30.0f;
-      double step_microsec = floor((double)60.0E6 / ((double)mm_per_min * step_per_mm));
-      
-      // About duty cycle
-      // 20kHz(50us) when duty cyle is 25 high / 75 low
-      // 13kHz(77us) when duty cycle is 50 high / 50 high
-      pulse_high_usec = pulse_low_usec = floor(step_microsec / 2);
-      if (step_microsec < 50.0) {
-        pulse_high_usec = floor(step_microsec / 4);
-        pulse_low_usec = floor(step_microsec * 3 / 4);
-      }
-      state = STEPPER_READY;
-      return;
+    void start(double move_mm, double mm_per_min, bool incremental = false) {
+        if (state != STEPPER_STOP) return;
+        if (move_mm == 0 || mm_per_min == 0) return;
+        long steps = floor(step_per_mm * move_mm);
+        if (incremental) target_step = position_step + steps;
+        else target_step = steps;
+        set_pulse_width(mm_per_min);
+        state = STEPPER_READY;
+        return;
     }
 
-    void stop() {
+    float get_mm(void) { return (float)((double)position_step / (double)step_per_mm);}
+    void set_mm(double current_mm) {position_step = (long)((double)step_per_mm * current_mm);}
+    bool get_max_swich(void) { return digitalRead(max_pin); }
+    bool get_min_swich(void) { return digitalRead(min_pin); }
 
-    }
+    bool is_stop() { return (state==STEPPER_STOP)?true:false; }
 
     void loop() {
       switch (state) {
@@ -88,8 +89,8 @@ class AsyncStepper {
           break;
         case STEPPER_DRIVE_CHECK_SWITCH:
           state = STEPPER_DRIVE_HIGH;
-          if (((target_step > position_step) && !digitalRead(max_pin))
-           || ((target_step < position_step) && !digitalRead(min_pin))) {
+          if (((target_step > position_step) && !get_max_swich())
+           || ((target_step < position_step) && !get_min_swich())) {
              state = STEPPER_STOP;
            }
           break;
@@ -104,9 +105,8 @@ class AsyncStepper {
           break;
         case STEPPER_DRIVE_LOW:
           digitalWrite(pul_pin, HIGH);
-          position_step += (target_step > position_step)?(1):(-11);
-          ////Serial.print(position_step);
-          //直前時間の更新
+          if (target_step > position_step) position_step++;
+          if (target_step < position_step) position_step--;
           prev_micros = micros();
           state = STEPPER_DRIVE_KEEP_LOW;
           if (position_step == target_step) state = STEPPER_STOP;
