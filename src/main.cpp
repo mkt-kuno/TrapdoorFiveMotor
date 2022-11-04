@@ -10,6 +10,8 @@
 #define AUTO_REPORT_MSEC (1000)
 #define MSTIMER_MILLIS (10)
 
+#define DUMMY_FIRMWARE (0)
+
 /**
  * @brief 非同期ステッピングモータドライバ
  * pulse, dir, ena, max, min
@@ -26,22 +28,20 @@ AsyncStepper MotorL(44,45,46,47,48);
 AsyncStepper MotorM(49,50,51,52,53);
 
 AsyncSerial ASerial(0);//0(RX), 1(TX)
-//AsyncSerial ASerial(1);//19(RX), 18(TX)	
+//AsyncSerial Serial(1);//19(RX), 18(TX)	
 GCodeParser GCode;
 
 //非同期タイマー
 AsyncTimer ATimer;
 
 static uint64_t t_millis = 0;
+void tick() { t_millis++; }
 float secs(void) {
     volatile uint64_t temp;
     noInterrupts();
     temp = t_millis;
     interrupts();
-    return (float)((double)temp * MSTIMER_MILLIS / 1000.0);
-}
-void tick() {
-  t_millis++;
+    return (float)((float)temp * MSTIMER_MILLIS / 1000.0);
 }
 
 typedef enum GCODE_STATE {
@@ -61,22 +61,24 @@ enum EEPROM_INDEX {
 };
 
 void eeprom_init(void){
-    EEPROMwl.put(EEPROM_INDEX_MOTOR_I, (long)0);
-    EEPROMwl.put(EEPROM_INDEX_MOTOR_J, (long)0);
-    EEPROMwl.put(EEPROM_INDEX_MOTOR_K, (long)0);
-    EEPROMwl.put(EEPROM_INDEX_MOTOR_L, (long)0);
-    EEPROMwl.put(EEPROM_INDEX_MOTOR_M, (long)0);
+    long val = 0;
+    EEPROMwl.put(EEPROM_INDEX_MOTOR_I, val);
+    EEPROMwl.put(EEPROM_INDEX_MOTOR_J, val);
+    EEPROMwl.put(EEPROM_INDEX_MOTOR_K, val);
+    EEPROMwl.put(EEPROM_INDEX_MOTOR_L, val);
+    EEPROMwl.put(EEPROM_INDEX_MOTOR_M, val);
 }
 void report(bool forced=false);
+void motor_loop(void);
 
 void setup() {
     MsTimer2::set(MSTIMER_MILLIS, tick);
     MsTimer2::start();
-    ASerial.begin(921600);
+    ASerial.begin(115200);
     ATimer.init();
     ATimer.next_millisec(AUTO_REPORT_MSEC);
     EEPROMwl.begin(EEPROM_LAYOUT_VERSION, EEPROM_INDEX_NUM);
-
+    
     long steps = -1;
     EEPROMwl.get(EEPROM_INDEX_MOTOR_I, steps);
     MotorI.set_current_steps(steps);
@@ -134,7 +136,7 @@ void G52(GCodeParser *gcode) {
 
 void gcode_loop() {
     if (state != GCODE_IDLE) return;
-    if (!Serial.available()) return;
+    if (!ASerial.available()) return;
     if (!GCode.AddCharToLine(ASerial.read())) return;
     GCode.ParseLine();
     if (GCode.HasWord('G')) {
@@ -194,20 +196,47 @@ bool all_motor_stop(){
     return true;
 }
 
-static void report(bool forced=false) {
-    if (forced || ATimer.trigger_and_next()) {
-        ASerial.print("REPORT: {");
-        ASerial.print(String("\"Time\":") + String(secs(), 3) + ",");
-        if (state==GCODE_IDLE) ASerial.print("\"Status\":\"IDLE\",");
-        else ASerial.print("\"Status\":\"BUSY\",");
-        ASerial.print(String("\"I\":") + String(MotorI.get_current_mm(), 3) + ",");
-        ASerial.print(String("\"J\":") + String(MotorJ.get_current_mm(), 3) + ",");
-        ASerial.print(String("\"K\":") + String(MotorK.get_current_mm(), 3) + ",");
-        ASerial.print(String("\"L\":") + String(MotorL.get_current_mm(), 3) + ",");
-        ASerial.print(String("\"M\":") + String(MotorM.get_current_mm(), 3));
+void report_json(bool forced) {
+    static char dbuf[8];
+    if (forced || (ATimer.trigger_and_next())) {
+        ASerial.print("REPORT: {\"Time\":");
+        ASerial.print(dtostrf(secs(),0,3,dbuf));
+        if (state==GCODE_IDLE) ASerial.print(",\"Status\":\"IDLE\",");
+        else ASerial.print(",\"Status\":\"BUSY\",");
+        ASerial.print("\"I\":");
+        ASerial.print(dtostrf(MotorI.get_current_mm(),0,3,dbuf));
+        ASerial.print(",\"J\":");
+        ASerial.print(dtostrf(MotorJ.get_current_mm(),0,3,dbuf));
+        ASerial.print(",\"K\":");
+        ASerial.print(dtostrf(MotorK.get_current_mm(),0,3,dbuf));
+        ASerial.print(",\"L\":");
+        ASerial.print(dtostrf(MotorL.get_current_mm(),0,3,dbuf));
+        ASerial.print(",\"M\":");
+        ASerial.print(dtostrf(MotorM.get_current_mm(),0,3,dbuf));
         ASerial.println("}");
     }
 }
+
+void report_short(bool forced) {
+    static char buf[128];
+    static char dbuf[8];
+    pinMode(7, OUTPUT);
+    if (forced || (ATimer.trigger_and_next())) {
+        int bid = 0;
+        memset(buf, 0x00, sizeof(buf));
+        bid += sprintf(&buf[bid], "T:%s", dtostrf(secs(),0,3,dbuf));
+        if (state==GCODE_IDLE) bid += sprintf(&buf[bid], ",S:I");
+        else bid += sprintf(&buf[bid], ",S:B");
+        bid += sprintf(&buf[bid], ",I:%s", dtostrf(MotorI.get_current_mm(),0,3,dbuf));
+        bid += sprintf(&buf[bid], ",J:%s", dtostrf(MotorJ.get_current_mm(),0,3,dbuf));
+        bid += sprintf(&buf[bid], ",K:%s", dtostrf(MotorK.get_current_mm(),0,3,dbuf));
+        bid += sprintf(&buf[bid], ",L:%s", dtostrf(MotorL.get_current_mm(),0,3,dbuf));
+        bid += sprintf(&buf[bid], ",M:%s", dtostrf(MotorM.get_current_mm(),0,3,dbuf));
+        ASerial.println(buf);
+    }
+}
+
+void report(bool forced){report_json(forced);};
 
 void motor_loop(){
     MotorI.loop();
@@ -229,6 +258,6 @@ void motor_loop(){
 void loop() {
     gcode_loop();
     motor_loop();
-    report();
+    report(false);
     ASerial.loop();
 }
