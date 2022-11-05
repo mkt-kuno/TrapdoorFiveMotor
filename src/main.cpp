@@ -10,7 +10,7 @@
 #define AUTO_REPORT_MSEC (1000)
 #define MSTIMER_MILLIS (10)
 
-#define DUMMY_FIRMWARE (0)
+#define DUMMY_FIRMWARE (1)
 
 /**
  * @brief 非同期ステッピングモータドライバ
@@ -121,15 +121,15 @@ void G52(GCodeParser *gcode) {
         EEPROMwl.put(EEPROM_INDEX_MOTOR_J, MotorJ.get_current_steps());
     }
     if (gcode->HasWord('K'))  {
-        MotorJ.set_current_mm(gcode->GetWordValue('K'));
+        MotorK.set_current_mm(gcode->GetWordValue('K'));
         EEPROMwl.put(EEPROM_INDEX_MOTOR_K, MotorK.get_current_steps());
     }
     if (gcode->HasWord('L')) {
-        MotorJ.set_current_mm(gcode->GetWordValue('L'));
+        MotorL.set_current_mm(gcode->GetWordValue('L'));
         EEPROMwl.put(EEPROM_INDEX_MOTOR_L, MotorL.get_current_steps());
     }
     if (gcode->HasWord('M')) {
-        MotorJ.set_current_mm(gcode->GetWordValue('M'));
+        MotorM.set_current_mm(gcode->GetWordValue('M'));
         EEPROMwl.put(EEPROM_INDEX_MOTOR_M, MotorM.get_current_steps());
     }
 }
