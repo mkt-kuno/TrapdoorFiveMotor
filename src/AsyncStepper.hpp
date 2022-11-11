@@ -8,7 +8,7 @@
 #define MIN_POSITION_MM         (-50L)
 #define MAX_SPEED_MM_PER_MIN    (30L)
 #define STEP_PER_MINUTE         (2400L)
-#define DUMMY_FIRMWARE          (1)
+#define DUMMY_FIRMWARE          (0)
 
 // Memo
 // Linear Actuator: 2400 steps / mm

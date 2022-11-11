@@ -7,10 +7,10 @@
 #include "AsyncSerial.hpp"
 #include "AsyncTimer.hpp"
 
-#define AUTO_REPORT_MSEC (1000)
+#define AUTO_REPORT_MSEC (200)
 #define MSTIMER_MILLIS (10)
 
-#define DUMMY_FIRMWARE (1)
+#define DUMMY_FIRMWARE (0)
 
 /**
  * @brief 非同期ステッピングモータドライバ
