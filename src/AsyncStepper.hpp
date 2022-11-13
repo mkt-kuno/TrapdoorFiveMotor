@@ -7,7 +7,7 @@
 #define MAX_POSITION_MM         (50L)
 #define MIN_POSITION_MM         (-50L)
 #define MAX_SPEED_MM_PER_MIN    (30L)
-#define STEP_PER_MINUTE         (2400L)
+#define STEP_PER_MM             (2400L)
 #define DUMMY_FIRMWARE          (0)
 
 // Memo
@@ -42,7 +42,7 @@ private:
         if (mm_per_min < 0.0) mm_per_min = mm_per_min * (-1.0);
         if (mm_per_min > MAX_SPEED_MM_PER_MIN) mm_per_min = MAX_SPEED_MM_PER_MIN;
 
-        double step_microsec = floor((double)60.0E6 / ((double)mm_per_min * STEP_PER_MINUTE));
+        double step_microsec = floor((double)60.0E6 / ((double)mm_per_min * STEP_PER_MM));
         pulse_high_usec = pulse_low_usec = floor(step_microsec / 2);
         if (step_microsec < 50.0) {
             pulse_high_usec = floor(step_microsec / 4);
@@ -69,7 +69,7 @@ public:
         if ((incremental && move_mm == 0) || mm_per_min == 0) return;
         if (move_mm > MAX_POSITION_MM) move_mm = MAX_POSITION_MM;
         else if (move_mm < MIN_POSITION_MM) move_mm = MIN_POSITION_MM;
-        long steps = floor(STEP_PER_MINUTE * move_mm);
+        long steps = floor(STEP_PER_MM * move_mm);
         if (incremental) target_step = position_step + steps;
         else target_step = steps;
         set_pulse_width(mm_per_min);
@@ -78,19 +78,19 @@ public:
     }
 
     float get_current_mm(void) {
-        return (float)((double)position_step / STEP_PER_MINUTE);
+        return (float)((double)position_step / STEP_PER_MM);
     }
     void set_current_mm(double current_mm) {
         if (state != STEPPER_STOP) return;
         if (current_mm > MAX_POSITION_MM) current_mm = MAX_POSITION_MM;
         else if (current_mm < MIN_POSITION_MM) current_mm = MIN_POSITION_MM;
-        position_step = (long)((double)STEP_PER_MINUTE * current_mm);
+        position_step = (long)((double)STEP_PER_MM * current_mm);
     }
     long get_current_steps(void) { return position_step;}
     void set_current_steps(long current_steps) {
         if (state != STEPPER_STOP) return;
-        if (current_steps > ((long)STEP_PER_MINUTE * MAX_POSITION_MM)) current_steps = (long)STEP_PER_MINUTE * MAX_POSITION_MM;
-        if (current_steps < ((long)STEP_PER_MINUTE * MIN_POSITION_MM)) current_steps = (long)STEP_PER_MINUTE * MIN_POSITION_MM;
+        if (current_steps > ((long)STEP_PER_MM * MAX_POSITION_MM)) current_steps = (long)STEP_PER_MM * MAX_POSITION_MM;
+        if (current_steps < ((long)STEP_PER_MM * MIN_POSITION_MM)) current_steps = (long)STEP_PER_MM * MIN_POSITION_MM;
         position_step = current_steps;
     }
 #if DUMMY_FIRMWARE
