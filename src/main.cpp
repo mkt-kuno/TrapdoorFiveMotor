@@ -197,7 +197,7 @@ bool all_motor_stop(){
 }
 
 void report_json(bool forced) {
-    static char dbuf[8];
+    static char dbuf[32];
     if (forced || (ATimer.trigger_and_next())) {
         ASerial.print("REPORT: {\"Time\":");
         ASerial.print(dtostrf(secs(),0,3,dbuf));
@@ -219,7 +219,7 @@ void report_json(bool forced) {
 
 void report_short(bool forced) {
     static char buf[128];
-    static char dbuf[8];
+    static char dbuf[32];
     pinMode(7, OUTPUT);
     if (forced || (ATimer.trigger_and_next())) {
         int bid = 0;
