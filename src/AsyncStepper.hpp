@@ -29,8 +29,8 @@ class AsyncStepper {
 private:
     long position_step = 0;
     long target_step = 0;
-    unsigned int pulse_high_usec = 0;
-    unsigned int pulse_low_usec = 0;
+    unsigned long pulse_high_usec = 0;
+    unsigned long pulse_low_usec = 0;
     STEPPER_STATE_T state = STEPPER_STOP;
     unsigned long prev_micros = 0;
     int ena_pin, dir_pin, pul_pin, max_pin, min_pin;
@@ -41,7 +41,7 @@ private:
     void set_pulse_width(double mm_per_min) {
         if (mm_per_min < 0.0) mm_per_min = mm_per_min * (-1.0);
         if (mm_per_min > MAX_SPEED_MM_PER_MIN) mm_per_min = MAX_SPEED_MM_PER_MIN;
-
+        
         double step_microsec = floor((double)60.0E6 / ((double)mm_per_min * STEP_PER_MM));
         pulse_high_usec = pulse_low_usec = floor(step_microsec / 2);
         if (step_microsec < 50.0) {
